@@ -321,7 +321,9 @@ dialog label{display:block;font-size:.78rem;color:var(--text3);margin-bottom:4px
 <div class="toolbar">
   <button class="tool-btn" onclick="showExport()">Export</button>
   <button class="tool-btn" onclick="showHistory()">History</button>
+  <button class="tool-btn" onclick="triggerImport()">Import</button>
 </div>
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="doImport(event)">
 
 <div class="toast" id="toast"></div>
 
@@ -867,6 +869,39 @@ function doExport(){
   URL.revokeObjectURL(a.href);
   document.getElementById('exportDialog').close();
   toast('Download started');
+}
+
+function triggerImport(){document.getElementById('importFile').click()}
+function doImport(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      const records = data.records || [];
+      const existing = loadEvents();
+      let added = 0;
+      records.forEach(rec=>{
+        (rec.events||[]).forEach(ev=>{
+          const ts = new Date(`${rec.date}T${ev.time}`);
+          const id = crypto.randomUUID();
+          if(ev.type==='noise'){
+            const tsEnd = ev.timeEnd ? new Date(`${rec.date}T${ev.timeEnd}`) : null;
+            existing.push({id,type:'noise',ts:ts.toISOString(),tsEnd:tsEnd?tsEnd.toISOString():null,note:ev.note||null,audioId:null});
+          } else {
+            existing.push({id,type:ev.type,ts:ts.toISOString(),note:ev.note||null});
+          }
+          added++;
+        });
+      });
+      saveEvents(existing);
+      renderLog();
+      toast(`${added}件 インポート`);
+    }catch(err){toast('読み込みエラー')}
+    e.target.value='';
+  };
+  reader.readAsText(file);
 }
 
 document.getElementById('headerDate').textContent = shortDate(now());
