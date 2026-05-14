@@ -395,6 +395,7 @@ function shortDate(d){
 }
 
 let useNow = true;
+let viewingDate = null;
 
 function loadEvents(){
   try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[];}
@@ -412,6 +413,7 @@ function getTimestamp(){
 
 function setNowMode(){
   useNow = true;
+  viewingDate = null;
   document.getElementById('tpNowBtn').className = 'tp-now active';
   document.getElementById('tpInputs').classList.add('hidden');
   document.getElementById('timePicker').classList.remove('manual');
@@ -689,7 +691,10 @@ function eventsForDate(ds){
 }
 
 function renderLog(targetDate){
-  const ds = targetDate || dateStr(now());
+  const ds = targetDate || viewingDate || dateStr(now());
+  viewingDate = ds;
+  const today = dateStr(now());
+  document.getElementById('logTitle').textContent = ds === today ? 'Today' : ds;
   const events = eventsForDate(ds);
   const container = document.getElementById('logContainer');
   if(!events.length){
