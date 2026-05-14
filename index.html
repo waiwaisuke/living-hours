@@ -374,6 +374,7 @@ dialog label{display:block;font-size:.78rem;color:var(--text3);margin-bottom:4px
   <div id="historyContent" style="max-height:50vh;overflow-y:auto"></div>
   <div class="actions-row">
     <button class="cancel" onclick="historyDialog.close()">Close</button>
+    <button class="confirm" onclick="addToHistoryDate()">この日に追加</button>
   </div>
 </dialog>
 
@@ -732,6 +733,20 @@ function toast(msg){
   el.classList.add('show');
   clearTimeout(el._t);
   el._t=setTimeout(()=>el.classList.remove('show'),1500);
+}
+
+function addToHistoryDate(){
+  const ds = document.getElementById('historyDate').value;
+  if(!ds) return;
+  document.getElementById('historyDialog').close();
+  document.getElementById('tpDate').value = ds;
+  document.getElementById('tpTime').value = '09:00';
+  useNow = false;
+  document.getElementById('tpNowBtn').className = 'tp-now inactive';
+  document.getElementById('tpInputs').classList.remove('hidden');
+  document.getElementById('timePicker').classList.add('manual');
+  renderLog(ds);
+  toast(`${ds} に追加`);
 }
 
 function showExport(){document.getElementById('exportDialog').showModal()}
