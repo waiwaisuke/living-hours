@@ -755,10 +755,10 @@ function renderHistory(){
       const durMin = dEnd ? Math.round((dEnd-d)/60000) : '?';
       const timeRange = dEnd ? `${timeStr(d)}~${timeStr(dEnd)}` : timeStr(d);
       const noteStr = e.note ? ` ${esc(e.note)}` : '';
-      return `<div class="log-item"><span class="time">${timeRange}</span><span class="dot noise"></span><span class="label">騒音<span class="duration">${durMin}分</span>${noteStr}</span></div>`;
+      return `<div class="log-item"><span class="time editable" onclick="editEvent('${e.id}')">${timeRange}</span><span class="dot noise"></span><span class="label">騒音<span class="duration">${durMin}分</span>${noteStr}</span><button class="del" onclick="deleteEvent('${e.id}');renderHistory()">&times;</button></div>`;
     }
     const label = e.type==='memo'? esc(e.note||'メモ') : LABELS[e.type];
-    return `<div class="log-item"><span class="time">${timeStr(d)}</span><span class="dot ${e.type}"></span><span class="label">${label}</span></div>`;
+    return `<div class="log-item"><span class="time editable" onclick="editEvent('${e.id}')">${timeStr(d)}</span><span class="dot ${e.type}"></span><span class="label">${label}</span><button class="del" onclick="deleteEvent('${e.id}');renderHistory()">&times;</button></div>`;
   }).join('');
 }
 
