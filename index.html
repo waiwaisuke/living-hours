@@ -684,7 +684,7 @@ async function deleteEvent(id){
 }
 
 function eventsForDate(ds){
-  return loadEvents().filter(e=>e.ts.startsWith(ds)).sort((a,b)=>a.ts.localeCompare(b.ts));
+  return loadEvents().filter(e=>dateStr(new Date(e.ts))===ds).sort((a,b)=>a.ts.localeCompare(b.ts));
 }
 
 function renderLog(targetDate){
@@ -768,20 +768,20 @@ function doExport(){
   let events = loadEvents();
   if(range==='month'){
     const prefix = dateStr(now()).slice(0,7);
-    events = events.filter(e=>e.ts.startsWith(prefix));
+    events = events.filter(e=>dateStr(new Date(e.ts)).startsWith(prefix));
   }
   events.sort((a,b)=>a.ts.localeCompare(b.ts));
 
   if(format==='share'){
     const grouped = {};
     events.forEach(e=>{
-      const ds = e.ts.slice(0,10);
+      const ds = dateStr(new Date(e.ts));
       if(!grouped[ds])grouped[ds]={date:ds,events:[],source:'living-hours-app'};
-      const ev = {type:e.type,time:e.ts.slice(11,16),note:e.note};
-      if(e.type==='noise'){ev.timeEnd=e.tsEnd?.slice(11,16)||null;ev.hasAudio=!!e.audioId}
+      const ev = {type:e.type,time:timeStr(new Date(e.ts)),note:e.note};
+      if(e.type==='noise'){ev.timeEnd=e.tsEnd?timeStr(new Date(e.tsEnd)):null;ev.hasAudio=!!e.audioId}
       grouped[ds].events.push(ev);
-      if(e.type==='sleep')grouped[ds].child_sleep=e.ts.slice(11,16);
-      if(e.type==='wake')grouped[ds].wake_up=e.ts.slice(11,16);
+      if(e.type==='sleep')grouped[ds].child_sleep=timeStr(new Date(e.ts));
+      if(e.type==='wake')grouped[ds].wake_up=timeStr(new Date(e.ts));
     });
     const content = JSON.stringify({records:Object.values(grouped)},null,2);
     const filename = `living-hours-${dateStr(now())}.json`;
@@ -816,13 +816,13 @@ function doExport(){
   if(format==='json'){
     const grouped = {};
     events.forEach(e=>{
-      const ds = e.ts.slice(0,10);
+      const ds = dateStr(new Date(e.ts));
       if(!grouped[ds])grouped[ds]={date:ds,events:[],source:'living-hours-app'};
-      const ev = {type:e.type,time:e.ts.slice(11,16),note:e.note};
-      if(e.type==='noise'){ev.timeEnd=e.tsEnd?.slice(11,16)||null;ev.hasAudio=!!e.audioId}
+      const ev = {type:e.type,time:timeStr(new Date(e.ts)),note:e.note};
+      if(e.type==='noise'){ev.timeEnd=e.tsEnd?timeStr(new Date(e.tsEnd)):null;ev.hasAudio=!!e.audioId}
       grouped[ds].events.push(ev);
-      if(e.type==='sleep')grouped[ds].child_sleep=e.ts.slice(11,16);
-      if(e.type==='wake')grouped[ds].wake_up=e.ts.slice(11,16);
+      if(e.type==='sleep')grouped[ds].child_sleep=timeStr(new Date(e.ts));
+      if(e.type==='wake')grouped[ds].wake_up=timeStr(new Date(e.ts));
     });
     content = JSON.stringify({records:Object.values(grouped)},null,2);
     filename = `living-hours-${dateStr(now())}.json`;
