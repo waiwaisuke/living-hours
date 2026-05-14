@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Living Hours</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#1a1a1a;--surface2:#252525;--surface3:#2e2e2e;
+  --text:#f0f0f0;--text2:#777;--text3:#555;
+  --accent:#4a9eff;
+  --home:#34d399;--home-bg:rgba(52,211,153,.08);
+  --out:#f59e0b;--out-bg:rgba(245,158,11,.08);
+  --sleep:#818cf8;--sleep-bg:rgba(129,140,248,.08);
+  --wake:#fb923c;--wake-bg:rgba(251,146,60,.08);
+  --noise:#ef4444;--noise-bg:rgba(239,68,68,.08);
+  --radius:18px;--safe-b:env(safe-area-inset-bottom,0px);
+}
+html{
+  font-family:-apple-system,'SF Pro Display','SF Pro Text',system-ui,'Hiragino Sans',sans-serif;
+  background:var(--bg);color:var(--text);
+  -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+  -webkit-font-smoothing:antialiased;
+}
+body{min-height:100dvh;padding:env(safe-area-inset-top,44px) 20px var(--safe-b) 20px;
+  max-width:420px;margin:0 auto;display:flex;flex-direction:column}
+
+/* Header */
+header{display:flex;align-items:baseline;justify-content:space-between;padding:8px 0 20px}
+header h1{font-size:1.4rem;font-weight:700;letter-spacing:-.01em}
+header .date{font-size:.82rem;color:var(--text2);font-weight:500}
+
+/* Action Buttons */
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;padding:22px 12px;border:none;border-radius:var(--radius);
+  color:var(--text);font-size:.92rem;font-weight:500;letter-spacing:.01em;
+  cursor:pointer;transition:transform .12s ease,opacity .12s;position:relative;
+  min-height:96px;overflow:hidden;
+}
+.btn::before{
+  content:'';position:absolute;inset:0;border-radius:var(--radius);
+  border:1px solid rgba(255,255,255,.04);pointer-events:none;
+}
+.btn:active{transform:scale(.93);opacity:.85}
+.btn .icon{
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  border-radius:10px;
+}
+.btn .icon svg{width:22px;height:22px}
+
+.btn.home{background:var(--home-bg)}
+.btn.home .icon{background:rgba(52,211,153,.15)}
+.btn.home .icon svg{fill:var(--home)}
+
+.btn.out{background:var(--out-bg)}
+.btn.out .icon{background:rgba(245,158,11,.15)}
+.btn.out .icon svg{fill:var(--out)}
+
+.btn.sleep{background:var(--sleep-bg)}
+.btn.sleep .icon{background:rgba(129,140,248,.15)}
+.btn.sleep .icon svg{fill:var(--sleep)}
+
+.btn.wake{background:var(--wake-bg)}
+.btn.wake .icon{background:rgba(251,146,60,.15)}
+.btn.wake .icon svg{fill:var(--wake)}
+
+.btn.noise{background:var(--noise-bg);grid-column:1/-1}
+.btn.noise .icon{background:rgba(239,68,68,.15)}
+.btn.noise .icon svg{fill:none;stroke:var(--noise);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.noise.recording{
+  background:rgba(239,68,68,.15);
+  animation:pulse-noise 1.5s ease-in-out infinite;
+}
+.btn.noise.recording .icon{background:rgba(239,68,68,.3)}
+@keyframes pulse-noise{
+  0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}
+  50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}
+}
+.noise-status{display:flex;align-items:center;gap:6px;font-size:.82rem}
+.noise-status .rec-dot{width:8px;height:8px;border-radius:50%;background:var(--noise);animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.noise-status .elapsed{font-variant-numeric:tabular-nums;color:var(--noise)}
+
+.btn.flash{animation:flash .5s ease-out}
+@keyframes flash{
+  0%{box-shadow:inset 0 0 0 2px rgba(255,255,255,.15)}
+  100%{box-shadow:inset 0 0 0 2px transparent}
+}
+
+/* Mic Toggle */
+.mic-toggle{
+  display:flex;align-items:center;justify-content:flex-end;
+  margin:-12px 0 12px;padding:0 4px;
+}
+.toggle-label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.toggle-track{
+  width:38px;height:22px;border-radius:11px;background:var(--surface2);
+  position:relative;transition:background .2s;
+}
+.toggle-track.on{background:var(--noise)}
+.toggle-thumb{
+  position:absolute;top:2px;left:2px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:transform .2s;
+}
+.toggle-track.on .toggle-thumb{transform:translateX(16px)}
+.toggle-text{font-size:.78rem;color:var(--text3);font-weight:500}
+
+/* Audio action buttons in timeline */
+.log-item .audio-actions{display:flex;gap:4px;flex-shrink:0}
+.log-item .dl-btn{
+  width:28px;height:28px;border:none;background:rgba(74,158,255,.1);
+  color:var(--accent);font-size:.75rem;cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.log-item .dl-btn:active{background:rgba(74,158,255,.2)}
+.log-item .rm-audio{
+  width:28px;height:28px;border:none;background:rgba(239,68,68,.08);
+  color:var(--text3);font-size:.75rem;cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.log-item .rm-audio:active{background:rgba(239,68,68,.15);color:var(--noise)}
+
+/* Memo */
+.memo-row{display:flex;gap:8px;margin-bottom:20px}
+.memo-input{
+  flex:1;padding:13px 16px;border:1px solid var(--surface2);border-radius:14px;
+  background:var(--surface);color:var(--text);font-size:.9rem;outline:none;
+  -webkit-user-select:text;user-select:text;transition:border-color .15s;
+}
+.memo-input::placeholder{color:var(--text3)}
+.memo-input:focus{border-color:rgba(74,158,255,.4)}
+.memo-send{
+  padding:13px 18px;border:none;border-radius:14px;
+  background:var(--accent);color:#fff;font-size:.9rem;font-weight:600;
+  cursor:pointer;white-space:nowrap;transition:opacity .12s;
+}
+.memo-send:active{opacity:.7}
+
+/* Time Picker */
+.time-picker{
+  display:flex;align-items:center;gap:8px;margin-bottom:16px;
+  padding:10px 14px;background:var(--surface);border-radius:14px;
+  border:1px solid transparent;transition:border-color .15s;
+}
+.time-picker.manual{border-color:rgba(74,158,255,.3)}
+.time-picker .tp-label{
+  font-size:.78rem;color:var(--text3);font-weight:500;min-width:28px;
+}
+.time-picker .tp-now{
+  padding:6px 14px;border:none;border-radius:10px;
+  background:var(--accent);color:#fff;font-size:.82rem;font-weight:600;
+  cursor:pointer;transition:opacity .12s;
+}
+.time-picker .tp-now:active{opacity:.7}
+.time-picker .tp-now.active{background:var(--accent)}
+.time-picker .tp-now.inactive{background:var(--surface2);color:var(--text2)}
+.time-picker input[type="date"],
+.time-picker input[type="time"]{
+  padding:6px 8px;border:1px solid var(--surface3);border-radius:10px;
+  background:var(--bg);color:var(--text);font-size:.85rem;
+  -webkit-appearance:none;outline:none;flex:1;max-width:140px;
+}
+.time-picker input:focus{border-color:rgba(74,158,255,.4)}
+.tp-inputs{display:flex;gap:6px;flex:1}
+.tp-inputs.hidden{display:none}
+
+/* Timeline */
+.section-label{
+  font-size:.75rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;
+  font-weight:600;margin-bottom:10px;padding-left:2px;
+}
+.log{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:90px}
+
+.log-item{
+  display:flex;align-items:center;gap:12px;padding:12px 0;
+  font-size:.88rem;position:relative;
+}
+.log-item+.log-item{border-top:1px solid rgba(255,255,255,.04)}
+.log-item .time{
+  color:var(--text2);font-variant-numeric:tabular-nums;min-width:46px;
+  font-size:.82rem;font-weight:500;
+}
+.log-item .dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+}
+.log-item .dot.home{background:var(--home)}
+.log-item .dot.out{background:var(--out)}
+.log-item .dot.sleep{background:var(--sleep)}
+.log-item .dot.wake{background:var(--wake)}
+.log-item .dot.memo{background:var(--accent)}
+.log-item .dot.noise{background:var(--noise)}
+.log-item .duration{color:var(--text3);font-size:.78rem;margin-left:2px}
+.log-item .time.editable{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;text-decoration-color:var(--text3)}
+.log-item .time.editable:active{color:var(--text)}
+.log-item .play-btn{
+  width:28px;height:28px;border:none;background:rgba(239,68,68,.12);
+  color:var(--noise);font-size:.85rem;cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:background .12s;
+}
+.log-item .play-btn:active{background:rgba(239,68,68,.25)}
+.log-item .play-btn.playing{background:rgba(239,68,68,.25)}
+.log-item .label{flex:1;color:var(--text)}
+.log-item .del{
+  width:28px;height:28px;border:none;background:transparent;
+  color:var(--text3);font-size:1rem;cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  transition:color .12s,background .12s;
+}
+.log-item .del:active{background:var(--surface2);color:var(--text2)}
+.log-empty{color:var(--text3);font-size:.85rem;text-align:center;padding:32px 0}
+
+/* Toolbar */
+.toolbar{
+  position:fixed;bottom:0;left:0;right:0;
+  display:flex;gap:10px;padding:14px 20px calc(14px + var(--safe-b));
+  background:linear-gradient(transparent 0%,var(--bg) 30%);justify-content:center;
+}
+.tool-btn{
+  flex:1;max-width:160px;padding:12px 0;text-align:center;
+  border:1px solid var(--surface2);border-radius:14px;
+  background:var(--surface);color:var(--text);font-size:.85rem;font-weight:500;
+  cursor:pointer;transition:background .12s;
+}
+.tool-btn:active{background:var(--surface2)}
+
+/* Toast */
+.toast{
+  position:fixed;top:env(safe-area-inset-top,44px);left:50%;transform:translateX(-50%) translateY(-8px);
+  padding:10px 22px;background:var(--surface2);color:var(--text);
+  border-radius:24px;font-size:.85rem;font-weight:500;
+  opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:100;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Dialog */
+dialog{
+  border:none;border-radius:var(--radius);background:var(--surface);color:var(--text);
+  max-width:340px;width:calc(100% - 40px);padding:24px;box-shadow:0 16px 48px rgba(0,0,0,.5);
+}
+dialog::backdrop{background:rgba(0,0,0,.65);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+dialog h2{font-size:1.05rem;font-weight:600;margin-bottom:16px}
+dialog .actions-row{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+dialog button{
+  padding:10px 18px;border:none;border-radius:12px;font-size:.9rem;font-weight:500;cursor:pointer;
+  transition:opacity .12s;
+}
+dialog button:active{opacity:.7}
+dialog .cancel{background:var(--surface2);color:var(--text)}
+dialog .confirm{background:var(--accent);color:#fff}
+dialog select,dialog input[type="date"]{
+  width:100%;padding:11px 12px;border:1px solid var(--surface2);border-radius:12px;
+  background:var(--bg);color:var(--text);font-size:.9rem;margin-bottom:10px;
+  -webkit-appearance:none;
+}
+dialog label{display:block;font-size:.78rem;color:var(--text3);margin-bottom:4px;font-weight:500}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Living Hours</h1>
+  <div class="date" id="headerDate"></div>
+</header>
+
+<div class="time-picker" id="timePicker">
+  <span class="tp-label">at</span>
+  <button class="tp-now active" id="tpNowBtn" onclick="toggleTimeMode()">Now</button>
+  <div class="tp-inputs hidden" id="tpInputs">
+    <input type="date" id="tpDate">
+    <input type="time" id="tpTime">
+  </div>
+</div>
+
+<div class="actions">
+  <button class="btn home" onclick="log('home')">
+    <span class="icon"><svg viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span>帰宅</span>
+  </button>
+  <button class="btn out" onclick="log('out')">
+    <span class="icon"><svg viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6m5-9a9 9 0 110 18 9 9 0 010-18z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span>外出</span>
+  </button>
+  <button class="btn sleep" onclick="log('sleep')">
+    <span class="icon"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+    <span>就寝</span>
+  </button>
+  <button class="btn wake" onclick="log('wake')">
+    <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+    <span>起床</span>
+  </button>
+  <button class="btn noise" id="noiseBtn" onclick="toggleNoise()">
+    <span class="icon"><svg viewBox="0 0 24 24"><path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14M12 12h.01"/><circle cx="12" cy="12" r="2"/></svg></span>
+    <span id="noiseBtnLabel">騒音</span>
+  </button>
+</div>
+<div class="mic-toggle" id="micToggle">
+  <label class="toggle-label" onclick="toggleMic(event)">
+    <span class="toggle-track" id="micTrack"><span class="toggle-thumb"></span></span>
+    <span class="toggle-text" id="micText">録音 OFF</span>
+  </label>
+</div>
+
+<div class="memo-row">
+  <input class="memo-input" id="memoInput" type="text" placeholder="メモ..." enterkeyhint="send">
+  <button class="memo-send" onclick="logMemo()">記録</button>
+</div>
+
+<div class="section-label" id="logTitle">Today</div>
+<div class="log" id="logContainer"></div>
+
+<div class="toolbar">
+  <button class="tool-btn" onclick="showExport()">Export</button>
+  <button class="tool-btn" onclick="showHistory()">History</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<dialog id="exportDialog">
+  <h2>Export</h2>
+  <label>フォーマット</label>
+  <select id="exportFormat">
+    <option value="json">JSON (パイプライン連携用)</option>
+    <option value="csv">CSV</option>
+    <option value="clipboard">クリップボードにコピー</option>
+  </select>
+  <label>期間</label>
+  <select id="exportRange">
+    <option value="month">今月</option>
+    <option value="all">全期間</option>
+  </select>
+  <div class="actions-row">
+    <button class="cancel" onclick="exportDialog.close()">Cancel</button>
+    <button class="confirm" onclick="doExport()">Export</button>
+  </div>
+</dialog>
+
+<dialog id="editEventDialog">
+  <h2 id="editEventTitle">時刻を修正</h2>
+  <input type="hidden" id="editEventId">
+  <label>日時</label>
+  <div style="display:flex;gap:6px;margin-bottom:10px">
+    <input type="date" id="editEventDate" style="flex:1">
+    <input type="time" id="editEventTime" style="flex:1">
+  </div>
+  <div id="editEndRow">
+    <label>終了</label>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input type="date" id="editEventDateEnd" style="flex:1">
+      <input type="time" id="editEventTimeEnd" style="flex:1">
+    </div>
+  </div>
+  <label>メモ</label>
+  <input type="text" id="editEventNote" style="width:100%;padding:11px 12px;border:1px solid var(--surface2);border-radius:12px;background:var(--bg);color:var(--text);font-size:.9rem;margin-bottom:4px" placeholder="任意">
+  <div class="actions-row">
+    <button class="cancel" onclick="editEventDialog.close()">Cancel</button>
+    <button class="confirm" onclick="saveEventEdit()">Save</button>
+  </div>
+</dialog>
+
+<dialog id="historyDialog">
+  <h2>History</h2>
+  <input type="date" id="historyDate">
+  <div id="historyContent" style="max-height:50vh;overflow-y:auto"></div>
+  <div class="actions-row">
+    <button class="cancel" onclick="historyDialog.close()">Close</button>
+  </div>
+</dialog>
+
+<script>
+const STORAGE_KEY = 'living_hours_events';
+const AUDIO_DB = 'living_hours_audio';
+const LABELS = {home:'帰宅',out:'外出',sleep:'就寝',wake:'起床',memo:'メモ',noise:'騒音'};
+
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function now(){return new Date()}
+function pad(n){return String(n).padStart(2,'0')}
+function dateStr(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function timeStr(d){return `${pad(d.getHours())}:${pad(d.getMinutes())}`}
+function shortDate(d){
+  const m = d.getMonth()+1, day = d.getDate();
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1]} ${day}, ${days[d.getDay()]}`;
+}
+
+let useNow = true;
+
+function loadEvents(){
+  try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[];}
+  catch{return[];}
+}
+function saveEvents(events){localStorage.setItem(STORAGE_KEY,JSON.stringify(events))}
+
+function getTimestamp(){
+  if(useNow) return now();
+  const d = document.getElementById('tpDate').value;
+  const t = document.getElementById('tpTime').value;
+  if(!d||!t) return now();
+  return new Date(`${d}T${t}`);
+}
+
+function setNowMode(){
+  useNow = true;
+  document.getElementById('tpNowBtn').className = 'tp-now active';
+  document.getElementById('tpInputs').classList.add('hidden');
+  document.getElementById('timePicker').classList.remove('manual');
+  renderLog();
+}
+
+function toggleTimeMode(){
+  if(useNow) setManualMode(); else setNowMode();
+}
+
+function setManualMode(){
+  useNow = false;
+  const n = now();
+  document.getElementById('tpDate').value = dateStr(n);
+  document.getElementById('tpTime').value = timeStr(n);
+  document.getElementById('tpNowBtn').className = 'tp-now inactive';
+  document.getElementById('tpInputs').classList.remove('hidden');
+  document.getElementById('timePicker').classList.add('manual');
+}
+
+function log(type){
+  const ts = getTimestamp();
+  const events = loadEvents();
+  events.push({id:crypto.randomUUID(),type,ts:ts.toISOString(),note:null});
+  saveEvents(events);
+  renderLog(useNow ? undefined : dateStr(ts));
+  const label = useNow ? `${LABELS[type]}  ${timeStr(ts)}` : `${LABELS[type]}  ${dateStr(ts)} ${timeStr(ts)}`;
+  toast(label);
+  const btn = document.querySelector(`.btn.${type}`);
+  if(btn){btn.classList.remove('flash');void btn.offsetWidth;btn.classList.add('flash')}
+}
+
+function logMemo(){
+  const input = document.getElementById('memoInput');
+  const text = input.value.trim();
+  if(!text)return;
+  const ts = getTimestamp();
+  const events = loadEvents();
+  events.push({id:crypto.randomUUID(),type:'memo',ts:ts.toISOString(),note:text});
+  saveEvents(events);
+  input.value='';
+  renderLog(useNow ? undefined : dateStr(ts));
+  toast(`メモ  ${timeStr(ts)}`);
+}
+
+// --- IndexedDB for audio ---
+function openAudioDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(AUDIO_DB,1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore('clips',{keyPath:'id'});
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function saveAudio(id, blob){
+  const db = await openAudioDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('clips','readwrite');
+    tx.objectStore('clips').put({id, blob, created: new Date().toISOString()});
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function getAudio(id){
+  const db = await openAudioDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('clips','readonly');
+    const req = tx.objectStore('clips').get(id);
+    req.onsuccess = ()=> resolve(req.result?.blob || null);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function deleteAudio(id){
+  const db = await openAudioDB();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction('clips','readwrite');
+    tx.objectStore('clips').delete(id);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+// --- Mic toggle ---
+let micEnabled = false;
+function toggleMic(e){
+  e.stopPropagation();
+  micEnabled = !micEnabled;
+  const track = document.getElementById('micTrack');
+  const text = document.getElementById('micText');
+  track.classList.toggle('on', micEnabled);
+  text.textContent = micEnabled ? '録音 ON' : '録音 OFF';
+}
+
+// --- Noise recording ---
+let noiseState = {active:false, startTime:null, timer:null, mediaRec:null, audioChunks:[], audioId:null};
+
+function toggleNoise(){
+  if(noiseState.active) stopNoise(); else startNoise();
+}
+
+async function startNoise(){
+  const btn = document.getElementById('noiseBtn');
+  const label = document.getElementById('noiseBtnLabel');
+  noiseState.active = true;
+  noiseState.startTime = getTimestamp();
+  noiseState.audioChunks = [];
+  noiseState.audioId = crypto.randomUUID();
+  btn.classList.add('recording');
+  label.innerHTML = '<span class="noise-status"><span class="rec-dot"></span><span class="elapsed" id="noiseElapsed">0:00</span></span>停止';
+
+  if(useNow){
+    noiseState.timer = setInterval(()=>{
+      const el = document.getElementById('noiseElapsed');
+      if(!el) return;
+      const sec = Math.floor((now()-noiseState.startTime)/1000);
+      const m = Math.floor(sec/60), s = sec%60;
+      el.textContent = `${m}:${pad(s)}`;
+    },1000);
+  }
+
+  if(micEnabled){
+    try{
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      const mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+      noiseState.mimeType = mimeType || 'audio/mp4';
+      noiseState.mediaRec = new MediaRecorder(stream, mimeType ? {mimeType} : {});
+      noiseState.mediaRec.ondataavailable = e=>{ if(e.data.size>0) noiseState.audioChunks.push(e.data) };
+      noiseState.mediaRec.start(1000);
+    }catch(e){
+      noiseState.mediaRec = null;
+    }
+  }
+}
+
+async function stopNoise(){
+  const btn = document.getElementById('noiseBtn');
+  const label = document.getElementById('noiseBtnLabel');
+  const endTime = now();
+  clearInterval(noiseState.timer);
+  btn.classList.remove('recording');
+  label.textContent = '騒音';
+
+  let audioId = null;
+  if(noiseState.mediaRec && noiseState.mediaRec.state !== 'inactive'){
+    await new Promise(r=>{
+      noiseState.mediaRec.onstop = r;
+      noiseState.mediaRec.stop();
+    });
+    noiseState.mediaRec.stream.getTracks().forEach(t=>t.stop());
+    if(noiseState.audioChunks.length){
+      const blob = new Blob(noiseState.audioChunks, {type: noiseState.mimeType});
+      audioId = noiseState.audioId;
+      await saveAudio(audioId, blob);
+    }
+  }
+
+  const events = loadEvents();
+  events.push({
+    id: crypto.randomUUID(),
+    type: 'noise',
+    ts: noiseState.startTime.toISOString(),
+    tsEnd: endTime.toISOString(),
+    note: null,
+    audioId: audioId,
+  });
+  saveEvents(events);
+  noiseState = {active:false, startTime:null, timer:null, mediaRec:null, audioChunks:[], audioId:null};
+  renderLog();
+  const dur = Math.round((endTime - new Date(events[events.length-1].ts))/60000);
+  toast(`騒音  ${dur}分間`);
+}
+
+let currentAudio = null;
+let currentPlayBtn = null;
+async function playAudio(audioId, btnEl){
+  if(currentAudio){
+    currentAudio.pause();currentAudio=null;
+    const wasSame = currentPlayBtn === btnEl;
+    if(currentPlayBtn) currentPlayBtn.classList.remove('playing');
+    currentPlayBtn = null;
+    if(wasSame) return;
+  }
+  const blob = await getAudio(audioId);
+  if(!blob){toast('音声なし');return;}
+  const url = URL.createObjectURL(blob);
+  currentAudio = new Audio(url);
+  currentPlayBtn = btnEl;
+  btnEl.classList.add('playing');
+  currentAudio.onended = ()=>{btnEl.classList.remove('playing');URL.revokeObjectURL(url);currentAudio=null;currentPlayBtn=null};
+  currentAudio.play();
+}
+
+async function downloadAudio(audioId, eventId){
+  const blob = await getAudio(audioId);
+  if(!blob){toast('音声なし');return;}
+  const events = loadEvents();
+  const ev = events.find(e=>e.id===eventId);
+  const dateLabel = ev ? ev.ts.slice(0,16).replace('T','_').replace(':','-') : 'audio';
+  const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `noise-${dateLabel}.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Download started');
+}
+
+async function removeAudioOnly(eventId){
+  const events = loadEvents();
+  const ev = events.find(e=>e.id===eventId);
+  if(!ev?.audioId) return;
+  await deleteAudio(ev.audioId);
+  ev.audioId = null;
+  saveEvents(events);
+  renderLog();
+  toast('音声を削除');
+}
+
+function editEvent(id){
+  const events = loadEvents();
+  const ev = events.find(e=>e.id===id);
+  if(!ev) return;
+  const d = new Date(ev.ts);
+  const hasEnd = ev.type === 'noise' && ev.tsEnd;
+  document.getElementById('editEventId').value = id;
+  document.getElementById('editEventTitle').textContent = `${LABELS[ev.type]||ev.type} - 修正`;
+  document.getElementById('editEventDate').value = dateStr(d);
+  document.getElementById('editEventTime').value = timeStr(d);
+  const endRow = document.getElementById('editEndRow');
+  if(hasEnd){
+    const dEnd = new Date(ev.tsEnd);
+    endRow.style.display = '';
+    document.getElementById('editEventDateEnd').value = dateStr(dEnd);
+    document.getElementById('editEventTimeEnd').value = timeStr(dEnd);
+  } else {
+    endRow.style.display = 'none';
+  }
+  document.getElementById('editEventNote').value = ev.note || '';
+  document.getElementById('editEventDialog').showModal();
+}
+
+function saveEventEdit(){
+  const id = document.getElementById('editEventId').value;
+  const events = loadEvents();
+  const ev = events.find(e=>e.id===id);
+  if(!ev) return;
+  const d = document.getElementById('editEventDate').value;
+  const t = document.getElementById('editEventTime').value;
+  if(d&&t) ev.ts = new Date(`${d}T${t}`).toISOString();
+  if(ev.type === 'noise' && ev.tsEnd){
+    const dEnd = document.getElementById('editEventDateEnd').value;
+    const tEnd = document.getElementById('editEventTimeEnd').value;
+    if(dEnd&&tEnd) ev.tsEnd = new Date(`${dEnd}T${tEnd}`).toISOString();
+  }
+  const note = document.getElementById('editEventNote').value.trim() || null;
+  ev.note = note;
+  saveEvents(events);
+  document.getElementById('editEventDialog').close();
+  renderLog();
+  toast('修正しました');
+}
+
+async function deleteEvent(id){
+  const events = loadEvents();
+  const ev = events.find(e=>e.id===id);
+  if(ev?.audioId) await deleteAudio(ev.audioId);
+  saveEvents(events.filter(e=>e.id!==id));
+  renderLog();
+}
+
+function eventsForDate(ds){
+  return loadEvents().filter(e=>e.ts.startsWith(ds)).sort((a,b)=>a.ts.localeCompare(b.ts));
+}
+
+function renderLog(targetDate){
+  const ds = targetDate || dateStr(now());
+  const events = eventsForDate(ds);
+  const container = document.getElementById('logContainer');
+  if(!events.length){
+    container.innerHTML='<div class="log-empty">No entries yet</div>';
+    return;
+  }
+  container.innerHTML = events.map(e=>{
+    const d = new Date(e.ts);
+    if(e.type==='noise'){
+      const dEnd = e.tsEnd ? new Date(e.tsEnd) : null;
+      const durMin = dEnd ? Math.round((dEnd-d)/60000) : '?';
+      const timeRange = dEnd ? `${timeStr(d)}~${timeStr(dEnd)}` : timeStr(d);
+      const noteStr = e.note ? `<span style="color:var(--text2);margin-left:4px">${esc(e.note)}</span>` : '';
+      const audioHtml = e.audioId ? `<span class="audio-actions">
+        <button class="play-btn" onclick="playAudio('${e.audioId}',this)" title="再生">&#9654;</button>
+        <button class="dl-btn" onclick="downloadAudio('${e.audioId}','${e.id}')" title="DL">&#8615;</button>
+        <button class="rm-audio" onclick="removeAudioOnly('${e.id}')" title="音声削除">&#10005;</button>
+      </span>` : '';
+      return `<div class="log-item">
+        <span class="time editable" onclick="editEvent('${e.id}')">${timeRange}</span>
+        <span class="dot noise"></span>
+        <span class="label">騒音<span class="duration">${durMin}分</span>${noteStr}</span>
+        ${audioHtml}
+        <button class="del" onclick="deleteEvent('${e.id}')">&times;</button>
+      </div>`;
+    }
+    const label = e.type==='memo'? esc(e.note||'メモ') : LABELS[e.type];
+    const note = e.type!=='memo'&&e.note ? `<span style="color:var(--text2);margin-left:4px">${esc(e.note)}</span>` : '';
+    return `<div class="log-item">
+      <span class="time editable" onclick="editEvent('${e.id}')">${timeStr(d)}</span>
+      <span class="dot ${e.type}"></span>
+      <span class="label">${label}${note}</span>
+      <button class="del" onclick="deleteEvent('${e.id}')">&times;</button>
+    </div>`;
+  }).join('');
+}
+
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),1500);
+}
+
+function showExport(){document.getElementById('exportDialog').showModal()}
+function showHistory(){
+  const dlg = document.getElementById('historyDialog');
+  const input = document.getElementById('historyDate');
+  input.value = dateStr(now());
+  renderHistory();
+  dlg.showModal();
+}
+
+function renderHistory(){
+  const ds = document.getElementById('historyDate').value;
+  const events = eventsForDate(ds);
+  const container = document.getElementById('historyContent');
+  if(!events.length){container.innerHTML='<div class="log-empty">No entries</div>';return;}
+  container.innerHTML = events.map(e=>{
+    const d = new Date(e.ts);
+    if(e.type==='noise'){
+      const dEnd = e.tsEnd ? new Date(e.tsEnd) : null;
+      const durMin = dEnd ? Math.round((dEnd-d)/60000) : '?';
+      const timeRange = dEnd ? `${timeStr(d)}~${timeStr(dEnd)}` : timeStr(d);
+      const noteStr = e.note ? ` ${esc(e.note)}` : '';
+      return `<div class="log-item"><span class="time">${timeRange}</span><span class="dot noise"></span><span class="label">騒音<span class="duration">${durMin}分</span>${noteStr}</span></div>`;
+    }
+    const label = e.type==='memo'? esc(e.note||'メモ') : LABELS[e.type];
+    return `<div class="log-item"><span class="time">${timeStr(d)}</span><span class="dot ${e.type}"></span><span class="label">${label}</span></div>`;
+  }).join('');
+}
+
+function doExport(){
+  const format = document.getElementById('exportFormat').value;
+  const range = document.getElementById('exportRange').value;
+  let events = loadEvents();
+  if(range==='month'){
+    const prefix = dateStr(now()).slice(0,7);
+    events = events.filter(e=>e.ts.startsWith(prefix));
+  }
+  events.sort((a,b)=>a.ts.localeCompare(b.ts));
+
+  if(format==='clipboard'){
+    const text = events.map(e=>{
+      const d=new Date(e.ts);
+      if(e.type==='noise'&&e.tsEnd){
+        const dEnd=new Date(e.tsEnd);
+        const dur=Math.round((dEnd-d)/60000);
+        return `${dateStr(d)} ${timeStr(d)}~${timeStr(dEnd)} 騒音 ${dur}分${e.audioId?' [録音あり]':''}${e.note?' '+e.note:''}`;
+      }
+      return `${dateStr(d)} ${timeStr(d)} ${LABELS[e.type]}${e.note?' '+e.note:''}`;
+    }).join('\n');
+    navigator.clipboard.writeText(text).then(()=>toast('Copied'));
+    document.getElementById('exportDialog').close();
+    return;
+  }
+
+  let content, filename, mime;
+  if(format==='json'){
+    const grouped = {};
+    events.forEach(e=>{
+      const ds = e.ts.slice(0,10);
+      if(!grouped[ds])grouped[ds]={date:ds,events:[],source:'living-hours-app'};
+      const ev = {type:e.type,time:e.ts.slice(11,16),note:e.note};
+      if(e.type==='noise'){ev.timeEnd=e.tsEnd?.slice(11,16)||null;ev.hasAudio=!!e.audioId}
+      grouped[ds].events.push(ev);
+      if(e.type==='sleep')grouped[ds].child_sleep=e.ts.slice(11,16);
+      if(e.type==='wake')grouped[ds].wake_up=e.ts.slice(11,16);
+    });
+    content = JSON.stringify({records:Object.values(grouped)},null,2);
+    filename = `living-hours-${dateStr(now())}.json`;
+    mime = 'application/json';
+  } else {
+    const rows = ['date,time,time_end,type,note,has_audio'];
+    events.forEach(e=>{
+      const d=new Date(e.ts);
+      const tEnd = e.tsEnd ? timeStr(new Date(e.tsEnd)) : '';
+      rows.push(`${dateStr(d)},${timeStr(d)},${tEnd},${e.type},"${(e.note||'').replace(/"/g,'""')}",${e.audioId?'yes':'no'}`);
+    });
+    content = rows.join('\n');
+    filename = `living-hours-${dateStr(now())}.csv`;
+    mime = 'text/csv';
+  }
+
+  const blob = new Blob([content],{type:mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('exportDialog').close();
+  toast('Download started');
+}
+
+document.getElementById('headerDate').textContent = shortDate(now());
+document.getElementById('memoInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();logMemo()}
+});
+document.getElementById('historyDate').addEventListener('change',renderHistory);
+document.getElementById('tpDate').addEventListener('change',()=>{
+  const ds = document.getElementById('tpDate').value;
+  if(ds) renderLog(ds);
+});
+renderLog();
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible') return;
+  document.getElementById('headerDate').textContent = shortDate(now());
+  renderLog();
+  if(noiseState.active){
+    const el = document.getElementById('noiseElapsed');
+    if(el){
+      const sec = Math.floor((now()-noiseState.startTime)/1000);
+      const m = Math.floor(sec/60), s = sec%60;
+      el.textContent = `${m}:${pad(s)}`;
+    }
+  }
+});
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
